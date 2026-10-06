@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 export const TEMPLATE = "templates/service";
@@ -18,7 +18,9 @@ export function form(overrides: Record<string, unknown> = {}): Record<string, un
 
 /** A fresh empty directory inside the repo's temp folder. */
 export function tempDir(prefix = "idp-test-"): string {
-  return mkdtempSync(join(process.env.TMP ?? process.env.TMPDIR ?? ".tmp", prefix));
+  const base = process.env.TMP ?? process.env.TMPDIR ?? ".tmp";
+  mkdirSync(base, { recursive: true }); // a fresh clone has no .tmp yet
+  return mkdtempSync(join(base, prefix));
 }
 
 /** Read a generated file. */

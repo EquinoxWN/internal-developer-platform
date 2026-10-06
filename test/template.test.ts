@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { parameterSchema } from "../src/params.js";
 import { loadTemplate, SUPPORTED_ACTIONS } from "../src/template.js";
-import { TEMPLATE } from "./helpers.js";
+import { TEMPLATE, tempDir } from "./helpers.js";
 
 test("the service template is a valid Backstage v1beta3 template", () => {
   const t = loadTemplate(TEMPLATE);
@@ -21,8 +21,8 @@ test("there is a skeleton for every language the form offers", () => {
 });
 
 test("malformed templates are refused with the reason", async () => {
-  const { mkdtempSync, writeFileSync } = await import("node:fs");
-  const dir = mkdtempSync(join(process.env.TMP ?? ".tmp", "bad-template-"));
+  const { writeFileSync } = await import("node:fs");
+  const dir = tempDir("bad-template-");
   const write = (yaml: string): void => writeFileSync(join(dir, "template.yaml"), yaml);
   write("apiVersion: v1\nkind: Template\nspec: {parameters: [], steps: []}\n");
   assert.throws(() => loadTemplate(dir), /apiVersion/);
