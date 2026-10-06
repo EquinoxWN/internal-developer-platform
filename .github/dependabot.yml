@@ -10,11 +10,19 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # Node.js 24 is the supported runtime, so its type definitions stay on 24.x.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: docker
     directory: /templates/service/skeleton/node
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # Generated services run on Node.js 24.
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: docker
     directory: /templates/service/skeleton/python
     schedule:
