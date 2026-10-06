@@ -1,0 +1,27 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.name }}
+  description: ${{ values.description | dump }}
+  annotations:
+    github.com/project-slug: ${{ values.slug }}
+    backstage.io/techdocs-ref: dir:.
+  tags:
+    - ${{ values.language }}
+spec:
+  type: service
+  lifecycle: experimental
+  owner: ${{ values.owner }}
+{%- if values.database %}
+  dependsOn:
+    - resource:${{ values.name }}-db
+---
+apiVersion: backstage.io/v1alpha1
+kind: Resource
+metadata:
+  name: ${{ values.name }}-db
+  description: PostgreSQL database for ${{ values.name }}
+spec:
+  type: database
+  owner: ${{ values.owner }}
+{%- endif %}

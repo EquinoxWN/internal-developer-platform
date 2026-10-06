@@ -1,0 +1,132 @@
+# Backstage Software Template: one form creates a service repository with CI, a Dockerfile and
+# catalog metadata already wired up. Backstage renders it with its scaffolder; `idp scaffold`
+# renders the same file locally and in CI (see src/scaffold.ts).
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: service
+  title: New service
+  description: An HTTP service with tests, CI, a hardened Dockerfile, docs and catalog entry, ready to deploy.
+  tags:
+    - recommended
+    - service
+spec:
+  owner: group:platform
+  type: service
+  parameters:
+    - title: About the service
+      required:
+        - name
+        - description
+        - owner
+      properties:
+        name:
+          title: Name
+          type: string
+          description: Lowercase letters, digits and single dashes, for example payments-api.
+          pattern: "^[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+          maxLength: 40
+          ui:autofocus: true
+        description:
+          title: Description
+          type: string
+          description: One sentence on what the service does.
+          minLength: 10
+          maxLength: 200
+          # Plain text only: no line breaks, quotes, braces or backticks that could break generated files.
+          pattern: "^[^\\r\\n\"'`{}$\\\\<>]+$"
+        owner:
+          title: Owner
+          type: string
+          description: The team that runs the service.
+          pattern: "^group:[a-z0-9]+(-[a-z0-9]+)*$"
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: Group
+    - title: Runtime
+      required:
+        - language
+      properties:
+        language:
+          title: Language
+          type: string
+          enum:
+            - node
+            - python
+            - go
+          enumNames:
+            - Node.js 24
+            - Python 3.12
+            - Go 1.26
+          default: node
+        database:
+          title: Needs a PostgreSQL database
+          type: boolean
+          default: false
+    - title: Repository
+      required:
+        - repoUrl
+      properties:
+        repoUrl:
+          title: Repository location
+          type: string
+          pattern: "^github\\.com\\?owner=[A-Za-z0-9-]{1,39}&repo=[a-z][a-z0-9]*(-[a-z0-9]+)*$"
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - github.com
+  steps:
+    - id: fetch-code
+      name: Service code, tests, Dockerfile and CI
+      action: fetch:template
+      input:
+        url: ./skeleton/${{ parameters.language }}
+        values:
+          name: ${{ parameters.name }}
+          # Package and module names cannot contain dashes (Python), so the template derives one.
+          module: ${{ parameters.name | replace("-", "_") }}
+          description: ${{ parameters.description }}
+          owner: ${{ parameters.owner }}
+          database: ${{ parameters.database }}
+    - id: fetch-common
+      name: Catalog entry and docs
+      action: fetch:template
+      input:
+        url: ./skeleton/common
+        values:
+          name: ${{ parameters.name }}
+          description: ${{ parameters.description }}
+          owner: ${{ parameters.owner }}
+          language: ${{ parameters.language }}
+          database: ${{ parameters.database }}
+          slug: ${{ parameters.repoUrl | projectSlug }}
+    - id: fetch-database
+      name: Database migrations
+      if: ${{ parameters.database }}
+      action: fetch:template
+      input:
+        url: ./skeleton/database
+        values:
+          name: ${{ parameters.name }}
+    - id: publish
+      name: Create the repository
+      action: publish:github
+      input:
+        repoUrl: ${{ parameters.repoUrl }}
+        description: ${{ parameters.description }}
+        defaultBranch: main
+        repoVisibility: private
+    - id: register
+      name: Register in the catalog
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
+        catalogInfoPath: /catalog-info.yaml
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps.publish.output.remoteUrl }}
+      - title: Open in catalog
+        icon: catalog
+        entityRef: ${{ steps.register.output.entityRef }}

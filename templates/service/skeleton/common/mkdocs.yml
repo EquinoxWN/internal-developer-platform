@@ -1,0 +1,8 @@
+site_name: ${{ values.name }}
+nav:
+  - Overview: index.md
+{%- if values.database %}
+  - Database: database.md
+{%- endif %}
+plugins:
+  - techdocs-core

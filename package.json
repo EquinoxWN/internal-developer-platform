@@ -1,0 +1,30 @@
+{
+  "name": "internal-developer-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cuts a new service from days to minutes: one form creates the repo, CI, cloud resources and dashboards, already wired up.",
+  "type": "module",
+  "bin": {
+    "idp": "dist/src/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "npm run build && node --test --test-timeout=120000 \"dist/test/*.test.js\"",
+    "measure": "npm run build && node dist/src/measure.js"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "dependencies": {
+    "@backstage/catalog-model": "1.10.1",
+    "ajv": "8.20.0",
+    "nunjucks": "3.2.4",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "@types/nunjucks": "3.2.6",
+    "typescript": "7.0.2"
+  }
+}
