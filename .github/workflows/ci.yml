@@ -34,7 +34,12 @@ jobs:
         with:
           go-version: "1.26"
           cache: false
-      - run: make ci
+      - name: make ci
+        shell: bash
+        run: make ci 2>&1 | tee make-ci.log
+      - name: Failing output as an annotation (logs need signing in)
+        if: failure()
+        run: tail -n 60 make-ci.log | python3 -c "import sys; print('::error title=make ci (last lines)::' + sys.stdin.read().replace('%', '%25').replace('\r', '').replace('\n', '%0A'))"
       - name: Form-to-passing-tests timing (job summary)
         run: make measure | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Known-vulnerability audit
