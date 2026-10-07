@@ -48,6 +48,12 @@ _Steps 1 and 2 are built and tested (M1); the rest is on the [roadmap](#roadmap)
 5. A default Grafana dashboard and alerts are generated for every new service.
 6. Catalog scorecards show which services meet the standards: owner, docs, SLOs.
 
+## Who it helps
+
+- **Who:** Platform teams, and developers starting a new service.
+- **The problem:** Each new service is set up by hand, so CI, Dockerfiles, catalog entries and docs differ from team to team.
+- **How to use it:** Fill in the Backstage template (or run the CLI's `scaffold` command) and get a Go, Node.js or Python service with CI, a digest-pinned non-root Dockerfile, a catalog entry and docs, which passes its own tests.
+
 ## Tech stack
 
 | Area | In M1 | Planned |
