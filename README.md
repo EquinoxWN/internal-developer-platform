@@ -9,7 +9,7 @@ Part of my **DevOps and Cloud** list · TypeScript · YAML · core project
 
 ## Proof it works
 
-`npm test` renders the Backstage template for all three languages with and without a database, validates every `catalog-info.yaml` with Backstage's own catalog rules, checks pinned actions and images, and runs each generated service's own tests (57 tests, 0 failed). The dependency audit is clean:
+`npm test` renders the Backstage template for all three languages with and without a database, validates every `catalog-info.yaml` with Backstage's own catalog rules, checks pinned actions and images, and runs each generated service's own tests (61 tests, 0 failed). The dependency audit is clean:
 
 ![npm test and npm audit output](docs/proof/tests.jpg)
 
@@ -72,7 +72,7 @@ Language: **TypeScript · YAML**. The template is in [`templates/service/`](temp
 ```bash
 make setup     # npm ci
 make lint      # strict TypeScript
-make test      # 57 tests, including all six generated services
+make test      # 61 tests, including all six generated services
 make measure   # time from form values to a generated service whose tests pass
 ```
 
@@ -102,12 +102,13 @@ To use the template in a Backstage instance, register `templates/service/templat
 
 ## Tests and results
 
-Full numbers and commands: [docs/results/m1.md](docs/results/m1.md).
+Full numbers and commands: [docs/results/m1.md](docs/results/m1.md). The 10-rule quality check (failure paths, retry safety, mutation testing) is in [docs/quality/2026-11-01.md](docs/quality/2026-11-01.md).
 
 | Check | Result |
 |---|---|
-| Tests (`make test`) | **57 passed**, 0 failed |
+| Tests (`make test`) | **61 passed**, 0 failed |
 | Generated services | all 6 combinations pass Backstage catalog validation and their own tests |
+| Safe to retry | `--out` must be missing or empty; files are rendered into a staging folder and moved in only when every step succeeds, so a failed run leaves nothing and can be re-run |
 | Injection and path safety | quotes, line breaks, `${{ }}`, `{% %}` and `../` refused before any file is written |
 | Form to passing tests | 0.3 s (Node.js), 2.2 to 3.2 s (Python), 4.2 s (Go) |
 | CI only | every generated image built, run, and probed on `/healthz` and `/readyz` |
@@ -122,7 +123,7 @@ flowchart TB
   R["render.test (4)<br/>path escapes, double writes"] --> RD["render.ts"]
   T["template.test (3)"] --> TP["template.yaml"]
   C["catalog.test (2)"] --> CM["@backstage/catalog-model"]
-  S["scaffold.test (37)<br/>3 languages x database"] --> G["generated services"]
+  S["scaffold.test (40)<br/>3 languages x database,<br/>retry after failure"] --> G["generated services"]
   G --> CM
   G --> GT["their own tests<br/>node --test, unittest, go test"]
   CI["CI job generated-images"] --> D["docker build + run<br/>/healthz, /readyz"]
