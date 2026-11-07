@@ -20,7 +20,14 @@ function coerce(value: string): unknown {
 export async function run(args: string[], out = console.log, err = console.error): Promise<number> {
   const [command, ...rest] = args;
   if (command === "validate-catalog" && rest.length === 1) {
-    const { entities, problems } = await validateCatalog(readFileSync(rest[0] as string, "utf8"));
+    let text: string;
+    try {
+      text = readFileSync(rest[0] as string, "utf8");
+    } catch (e) {
+      err(`error: ${(e as Error).message}`);
+      return 1;
+    }
+    const { entities, problems } = await validateCatalog(text);
     for (const p of problems) err(p);
     if (problems.length === 0) out(`ok: ${entities.map((e) => `${e.kind}:${e.metadata.name}`).join(", ")}`);
     return problems.length === 0 ? 0 : 1;

@@ -1,5 +1,5 @@
-import { mkdirSync, readFileSync } from "node:fs";
-import { join, resolve, sep } from "node:path";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmdirSync, rmSync } from "node:fs";
+import { dirname, join, resolve, sep } from "node:path";
 import { parseAllDocuments } from "yaml";
 import { evaluate } from "./expressions.js";
 import { parseRepoUrl, templateEnvironment } from "./nunjucks-env.js";
@@ -27,7 +27,9 @@ export interface ScaffoldResult {
  * Run a Backstage template locally: validate the form values, evaluate each step's `if` and
  * input, render every fetch:template skeleton into outDir, and plan (not perform) the steps that
  * reach outside: publish:github and catalog:register. Their outputs are computed the way the real
- * actions report them, so later steps and the template output can refer to them.
+ * actions report them, so later steps and the template output can refer to them. Files are
+ * rendered into a sibling staging directory and moved into outDir (which must be missing or
+ * empty) only when every step succeeded, so a failed run leaves nothing behind and can be retried.
  */
 export function scaffold(templateDir: string, values: Record<string, unknown>, outDir: string): ScaffoldResult {
   const template = loadTemplate(templateDir);
@@ -37,46 +39,56 @@ export function scaffold(templateDir: string, values: Record<string, unknown>, o
   const files: string[] = [];
   const skippedSteps: string[] = [];
   const planned: PlannedAction[] = [];
-  mkdirSync(outDir, { recursive: true });
+  const target = resolve(outDir);
+  if (existsSync(target) && readdirSync(target).length > 0) throw new Error(`${outDir} already exists and is not empty`);
+  mkdirSync(dirname(target), { recursive: true });
+  const staging = mkdtempSync(`${target}.partial-`);
   const templateRoot = resolve(templateDir);
 
-  for (const step of template.steps) {
-    const context = { parameters, steps };
-    if (step.if !== undefined && !evaluate(env, step.if, context)) {
-      skippedSteps.push(step.id);
-      continue;
+  try {
+    for (const step of template.steps) {
+      const context = { parameters, steps };
+      if (step.if !== undefined && !evaluate(env, step.if, context)) {
+        skippedSteps.push(step.id);
+        continue;
+      }
+      const input = (evaluate(env, step.input ?? {}, context) ?? {}) as Record<string, unknown>;
+      let output: Record<string, unknown> = {};
+      switch (step.action) {
+        case "fetch:template": {
+          const source = resolve(templateRoot, String(input.url));
+          if (!source.startsWith(templateRoot + sep)) throw new Error(`step ${step.id}: url must stay inside the template`);
+          files.push(...renderSkeleton(env, source, staging, (input.values ?? {}) as Record<string, unknown>));
+          break;
+        }
+        case "publish:github": {
+          const { owner, repo } = parseRepoUrl(input.repoUrl);
+          planned.push({ id: step.id, action: step.action, input });
+          output = {
+            remoteUrl: `https://github.com/${owner}/${repo}`,
+            repoContentsUrl: `https://github.com/${owner}/${repo}/blob/main`,
+          };
+          break;
+        }
+        case "catalog:register": {
+          planned.push({ id: step.id, action: step.action, input });
+          const path = String(input.catalogInfoPath ?? "/catalog-info.yaml").replace(/^\//, "");
+          const first = parseAllDocuments(readFileSync(join(staging, path), "utf8"))[0]?.toJS() as
+            | { kind?: string; metadata?: { name?: string } }
+            | undefined;
+          output = { entityRef: `${String(first?.kind ?? "component").toLowerCase()}:default/${first?.metadata?.name ?? ""}` };
+          break;
+        }
+        default:
+          throw new Error(`unsupported action ${step.action}`);
+      }
+      steps[step.id] = { output };
     }
-    const input = (evaluate(env, step.input ?? {}, context) ?? {}) as Record<string, unknown>;
-    let output: Record<string, unknown> = {};
-    switch (step.action) {
-      case "fetch:template": {
-        const source = resolve(templateRoot, String(input.url));
-        if (!source.startsWith(templateRoot + sep)) throw new Error(`step ${step.id}: url must stay inside the template`);
-        files.push(...renderSkeleton(env, source, outDir, (input.values ?? {}) as Record<string, unknown>));
-        break;
-      }
-      case "publish:github": {
-        const { owner, repo } = parseRepoUrl(input.repoUrl);
-        planned.push({ id: step.id, action: step.action, input });
-        output = {
-          remoteUrl: `https://github.com/${owner}/${repo}`,
-          repoContentsUrl: `https://github.com/${owner}/${repo}/blob/main`,
-        };
-        break;
-      }
-      case "catalog:register": {
-        planned.push({ id: step.id, action: step.action, input });
-        const path = String(input.catalogInfoPath ?? "/catalog-info.yaml").replace(/^\//, "");
-        const first = parseAllDocuments(readFileSync(join(outDir, path), "utf8"))[0]?.toJS() as
-          | { kind?: string; metadata?: { name?: string } }
-          | undefined;
-        output = { entityRef: `${String(first?.kind ?? "component").toLowerCase()}:default/${first?.metadata?.name ?? ""}` };
-        break;
-      }
-      default:
-        throw new Error(`unsupported action ${step.action}`);
-    }
-    steps[step.id] = { output };
+  } catch (e) {
+    rmSync(staging, { recursive: true, force: true });
+    throw e;
   }
+  if (existsSync(target)) rmdirSync(target);
+  renameSync(staging, target);
   return { parameters, files, skippedSteps, planned, output: evaluate(env, template.output ?? {}, { parameters, steps }) };
 }

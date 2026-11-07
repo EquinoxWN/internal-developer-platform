@@ -11,7 +11,8 @@ export const TEST_COMMANDS: Record<string, { cmd: string; args: string[]; env?: 
 
 /** Whether a command can be started on this machine. */
 export function available(cmd: string): boolean {
-  return spawnSync(cmd, ["--version"], { stdio: "ignore" }).status === 0 || spawnSync(cmd, ["version"], { stdio: "ignore" }).status === 0;
+  const probe = (args: string[]): boolean => spawnSync(cmd, args, { stdio: "ignore", timeout: 30_000 }).status === 0;
+  return probe(["--version"]) || probe(["version"]);
 }
 
 /** Run the generated service's own tests in dir; returns exit status and combined output. */
@@ -21,5 +22,7 @@ export function runGeneratedTests(language: string, dir: string): { status: numb
   const args = language === "node" ? ["--test", ...readdirSync(join(dir, "test")).map((f) => join("test", f))] : t.args;
   const start = performance.now();
   const r = spawnSync(t.cmd, args, { cwd: dir, env: { ...process.env, ...t.env }, encoding: "utf8", timeout: 120_000 });
-  return { status: r.status, output: `${r.stdout ?? ""}${r.stderr ?? ""}`, ms: performance.now() - start };
+  const failure = r.error ? `
+${r.error.message}` : ""; // spawn failure or the 120 s timeout
+  return { status: r.status, output: `${r.stdout ?? ""}${r.stderr ?? ""}${failure}`, ms: performance.now() - start };
 }

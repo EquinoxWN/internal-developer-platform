@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readdirSync, statSync } from "node:fs";
+import { cpSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, test } from "node:test";
 import { parse } from "yaml";
@@ -87,5 +87,33 @@ for (const language of ["node", "python", "go"]) {
 test("invalid form values stop the run before any file is written", () => {
   const out = tempDir();
   assert.throws(() => scaffold(TEMPLATE, form({ name: "Not Valid" }), out), ParameterError);
+  assert.deepEqual(readdirSync(out), []);
+});
+
+test("a run that fails partway leaves the output empty, so the same run can be retried", () => {
+  const template = tempDir("idp-broken-template-");
+  cpSync(TEMPLATE, template, { recursive: true });
+  writeFileSync(join(template, "skeleton/database/broken.txt"), "${{ values.notAValue }}");
+  const out = tempDir();
+  assert.throws(() => scaffold(template, form({ database: true }), out), /undefined/);
+  assert.deepEqual(readdirSync(out), [], "no half-written service is left behind");
+  const retry = scaffold(template, form({ database: false }), out);
+  assert.ok(retry.files.includes("catalog-info.yaml"));
+});
+
+test("an output directory that already holds files is refused before anything is written", () => {
+  const out = tempDir();
+  writeFileSync(join(out, "keep.txt"), "mine");
+  assert.throws(() => scaffold(TEMPLATE, form(), out), /not empty/);
+  assert.deepEqual(readdirSync(out), ["keep.txt"]);
+});
+
+test("a fetch:template url that leaves the template directory is refused", () => {
+  const template = tempDir("idp-escape-template-");
+  cpSync(TEMPLATE, template, { recursive: true });
+  const yamlPath = join(template, "template.yaml");
+  writeFileSync(yamlPath, readFileSync(yamlPath, "utf8").replace("url: ./skeleton/common", "url: ../../.."));
+  const out = tempDir();
+  assert.throws(() => scaffold(template, form(), out), /url must stay inside the template/);
   assert.deepEqual(readdirSync(out), []);
 });

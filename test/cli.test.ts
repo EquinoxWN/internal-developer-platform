@@ -31,3 +31,9 @@ test("invalid values exit with 1 and list every problem; bad usage exits with 2"
   assert.equal((await cli(["deploy"])).code, 2);
   assert.equal((await cli(["scaffold", "--template"])).code, 2);
 });
+
+test("validate-catalog on a missing or unreadable file exits with 1 and a one-line error", async () => {
+  const r = await cli(["validate-catalog", "does-not-exist/catalog-info.yaml"]);
+  assert.equal(r.code, 1);
+  assert.match(r.err.join("\n"), /^error: .*does-not-exist/);
+});
