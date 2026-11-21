@@ -9,7 +9,7 @@ Part of my **DevOps and Cloud** list · TypeScript · YAML · core project
 
 ## Proof it works
 
-`npm test` renders the Backstage template for all three languages with and without a database, validates every `catalog-info.yaml` with Backstage's own catalog rules, checks pinned actions and images, and runs each generated service's own tests (61 tests, 0 failed). The dependency audit is clean:
+`npm test` renders the Backstage template for all three languages with and without a database, validates every `catalog-info.yaml` with Backstage's own catalog rules, checks pinned actions and images, and runs each generated service's own tests (62 tests, 0 failed). The dependency audit is clean:
 
 ![npm test and npm audit output](docs/proof/tests.jpg)
 
@@ -72,7 +72,7 @@ Language: **TypeScript · YAML**. The template is in [`templates/service/`](temp
 ```bash
 make setup     # npm ci
 make lint      # strict TypeScript
-make test      # 61 tests, including all six generated services
+make test      # 62 tests, including all six generated services
 make measure   # time from form values to a generated service whose tests pass
 ```
 
@@ -106,7 +106,7 @@ Full numbers and commands: [docs/results/m1.md](docs/results/m1.md). The 10-rule
 
 | Check | Result |
 |---|---|
-| Tests (`make test`) | **61 passed**, 0 failed |
+| Tests (`make test`) | **62 passed**, 0 failed |
 | Generated services | all 6 combinations pass Backstage catalog validation and their own tests |
 | Safe to retry | `--out` must be missing or empty; files are rendered into a staging folder and moved in only when every step succeeds, so a failed run leaves nothing and can be re-run |
 | Injection and path safety | quotes, line breaks, `${{ }}`, `{% %}` and `../` refused before any file is written |

@@ -117,3 +117,13 @@ test("a fetch:template url that leaves the template directory is refused", () =>
   assert.throws(() => scaffold(template, form(), out), /url must stay inside the template/);
   assert.deepEqual(readdirSync(out), []);
 });
+
+test("a catalogInfoPath that leaves the output directory is refused", () => {
+  const template = tempDir("idp-escape-catalog-");
+  cpSync(TEMPLATE, template, { recursive: true });
+  const yamlPath = join(template, "template.yaml");
+  writeFileSync(yamlPath, readFileSync(yamlPath, "utf8").replace("catalogInfoPath: /catalog-info.yaml", "catalogInfoPath: ../../template.yaml"));
+  const out = tempDir();
+  assert.throws(() => scaffold(template, form(), out), /catalogInfoPath must stay inside the output/);
+  assert.deepEqual(readdirSync(out), []);
+});

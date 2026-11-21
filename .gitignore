@@ -20,3 +20,11 @@ CLAUDE.md
 .gomodcache/
 .gopath/
 generated/
+
+# Secrets
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.tfstate

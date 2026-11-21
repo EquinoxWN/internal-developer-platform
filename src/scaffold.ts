@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmdirSync, rmSync } from "node:fs";
-import { dirname, join, resolve, sep } from "node:path";
+import { dirname, resolve, sep } from "node:path";
 import { parseAllDocuments } from "yaml";
 import { evaluate } from "./expressions.js";
 import { parseRepoUrl, templateEnvironment } from "./nunjucks-env.js";
@@ -44,6 +44,7 @@ export function scaffold(templateDir: string, values: Record<string, unknown>, o
   mkdirSync(dirname(target), { recursive: true });
   const staging = mkdtempSync(`${target}.partial-`);
   const templateRoot = resolve(templateDir);
+  let output: unknown;
 
   try {
     for (const step of template.steps) {
@@ -53,7 +54,7 @@ export function scaffold(templateDir: string, values: Record<string, unknown>, o
         continue;
       }
       const input = (evaluate(env, step.input ?? {}, context) ?? {}) as Record<string, unknown>;
-      let output: Record<string, unknown> = {};
+      let stepOutput: Record<string, unknown> = {};
       switch (step.action) {
         case "fetch:template": {
           const source = resolve(templateRoot, String(input.url));
@@ -64,7 +65,7 @@ export function scaffold(templateDir: string, values: Record<string, unknown>, o
         case "publish:github": {
           const { owner, repo } = parseRepoUrl(input.repoUrl);
           planned.push({ id: step.id, action: step.action, input });
-          output = {
+          stepOutput = {
             remoteUrl: `https://github.com/${owner}/${repo}`,
             repoContentsUrl: `https://github.com/${owner}/${repo}/blob/main`,
           };
@@ -72,23 +73,25 @@ export function scaffold(templateDir: string, values: Record<string, unknown>, o
         }
         case "catalog:register": {
           planned.push({ id: step.id, action: step.action, input });
-          const path = String(input.catalogInfoPath ?? "/catalog-info.yaml").replace(/^\//, "");
-          const first = parseAllDocuments(readFileSync(join(staging, path), "utf8"))[0]?.toJS() as
+          const path = resolve(staging, String(input.catalogInfoPath ?? "/catalog-info.yaml").replace(/^\//, ""));
+          if (!path.startsWith(staging + sep)) throw new Error(`step ${step.id}: catalogInfoPath must stay inside the output`);
+          const first = parseAllDocuments(readFileSync(path, "utf8"))[0]?.toJS() as
             | { kind?: string; metadata?: { name?: string } }
             | undefined;
-          output = { entityRef: `${String(first?.kind ?? "component").toLowerCase()}:default/${first?.metadata?.name ?? ""}` };
+          stepOutput = { entityRef: `${String(first?.kind ?? "component").toLowerCase()}:default/${first?.metadata?.name ?? ""}` };
           break;
         }
         default:
           throw new Error(`unsupported action ${step.action}`);
       }
-      steps[step.id] = { output };
+      steps[step.id] = { output: stepOutput };
     }
+    output = evaluate(env, template.output ?? {}, { parameters, steps });
   } catch (e) {
     rmSync(staging, { recursive: true, force: true });
     throw e;
   }
   if (existsSync(target)) rmdirSync(target);
   renameSync(staging, target);
-  return { parameters, files, skippedSteps, planned, output: evaluate(env, template.output ?? {}, { parameters, steps }) };
+  return { parameters, files, skippedSteps, planned, output };
 }
